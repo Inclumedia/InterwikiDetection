@@ -84,14 +84,16 @@ $wgInterwikiDetectionNamespaces = array(
 $wgInterwikiDetectionWikipediaUrl = 'https://en.wikipedia.org/wiki/$1';
 $wgGroupPermissions['sysop']['poll'] = true;
 // Don't poll more than once every x seconds
-$wgInterwikiDetectionMinimumSecondsBetweenPolls = 0;
+$wgInterwikiDetectionMinimumSecondsBetweenPolls = -1;
 // This is to prevent infinite loops from occurring
 $wgInterwikiExistenceRecursionInProgress = false;
 // This is the interwiki prefix to use for making blue links.
 $wgInterwikiDetectionPrefix = 'wikipedia';
 $wgInterwikiDetectionLocalLinksGoInterwiki = true;
-$wgInterwikiDetectionApiQueryBegin = 'https://en.wikipedia.org/w/api.php?action=query&titles=';
-$wgInterwikiDetectionApiQuerySeparator = '%7C';
+#$wgInterwikiDetectionApiQueryBegin = 'https://en.wikipedia.org/w/api.php?action=query&titles=';
+$wgInterwikiDetectionApiQueryBegin = 'https://en.wikipedia.org/w/api.php?action=query&format=json';
+#$wgInterwikiDetectionApiQuerySeparator = '%7C';
+$wgInterwikiDetectionApiQuerySeparator = '|';
 #$wgInterwikiDetectionApiQueryEnd = '&format=jsonfm';
 $wgInterwikiDetectionApiQueryEnd = '&format=json';
 $wgInterwikiDetectionOrphanInterval = 1000000; // A day?

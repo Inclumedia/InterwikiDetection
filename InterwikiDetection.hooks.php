@@ -266,15 +266,18 @@ class InterwikiDetectionHooks {
 	$apiQuery = $wgInterwikiDetectionApiQueryBegin;
 	$firstRow = true;
 	$secondsRequirementMet = false;
+	$data = array( 'titles' => '' );
 	foreach ( $res as $row ) {
 	    if ( !$firstRow ) {
-		$apiQuery .= $wgInterwikiDetectionApiQuerySeparator;
+	#	$apiQuery .= $wgInterwikiDetectionApiQuerySeparator;
+		$data['titles'] .= $wgInterwikiDetectionApiQuerySeparator;
 	    }
 	    $firstRow = false;
 	    $iwdTitle[$row->iwd_id] = $row->iwd_title;
-	    $apiQuery .= urlencode ( $row->iwd_title );
+	    #$apiQuery .= urlencode ( $row->iwd_title );
+	    $data['titles'] .= $row->iwd_title;
 	    if ( $currentTime - $row->iwd_polled
-		> $wgInterwikiDetectionMinimumSecondsBetweenPolls ) {
+		>= $wgInterwikiDetectionMinimumSecondsBetweenPolls ) {
 		$secondsRequirementMet = true;
 	    }
 	}
@@ -282,30 +285,34 @@ class InterwikiDetectionHooks {
 	if ( !$secondsRequirementMet ) {
 	    return;
 	}
-	$apiQuery = str_replace( ' ', '_', $apiQuery );
-	$apiQuery .= $wgInterwikiDetectionApiQueryEnd;
+	#$apiQuery = str_replace( ' ', '_', $apiQuery );
+	#$apiQuery .= $wgInterwikiDetectionApiQueryEnd;
 	#echo $apiQuery;
 	#die();
 	// Poll the API
 	$apiPull = array();
 	$iwdExists = array();
-	$opts = array(
+	/*$opts = array(
 	    'http'=>array(
 		'method' => "POST",
 		'header' => $wgInterwikiDetectionUserAgent
 	    )
 	);
-	$streamContext = stream_context_create( $opts );
-	$contents = file_get_contents ( $apiQuery, false, $streamContext );
+	$streamContext = stream_context_create( $opts );*/
+	#$contents = file_get_contents ( $apiQuery, false, $streamContext );
+	$contents = InterwikiDetectionHooks::http_post ( $apiQuery, $data, $wgInterwikiDetectionUserAgent );
+	#$contents = $contents['content'];
+	$apiPull = $contents;
 	#echo $contents;
 	#die();
 	$apiPull = json_decode ( $contents, true );
+	#var_dump( $apiPull );
+	#die();
 	if ( isset( $apiPull['query']['normalized'] ) ) {
 	    $apiNormalized = $apiPull['query']['normalized'];
 	}
 	$apiPull = $apiPull['query']['pages'];
-	#var_dump( $apiPull );
-	#die();
+
 	foreach ( $apiPull as $apiPullElement ) {
 	    // Denormalize
 	    if ( isset( $apiNormalized ) ) {
@@ -448,6 +455,42 @@ class InterwikiDetectionHooks {
     // Vector support
     public static function InterwikiDetectionSkinTemplateNavigation( $skin, &$links ) {
 	   return self::InterwikiDetectionSkinTemplateTabs($skin, $links['views']);
+    }
+
+    /**
+    make an http POST request and return the response content and headers
+    @param string $url    url of the requested script
+    @param array $data    hash array of request variables
+    @return returns a hash array with response content and headers in the following form:
+	array ('content'=>'<html></html>'
+	    , 'headers'=>array ('HTTP/1.1 200 OK', 'Connection: close', ...)
+	    )
+    */
+    public static function http_post ( $url, $data, $header )
+    {
+#	$data_url = http_build_query ($data);
+#	$data_len = strlen ($data_url);
+
+#	return array ('content'=>file_get_contents ($url, false, stream_context_create (array ('http'=>array ('method'=>'POST'
+#		, 'header'=>$header
+#		, 'content'=>$data_url
+#		))))
+#	    , 'headers'=>$http_response_header
+#	    );
+#   }
+	$query = http_build_query($data);
+	$options = array(
+	    'http' => array(
+		'header' => "Content-Type: application/x-www-form-urlencoded\r\n".
+			    "Content-Length: ".strlen($query)."\r\n".
+			    $header,
+		'method'  => "POST",
+		'content' => $query,
+	    ),
+	);
+	$context = stream_context_create($options);
+	$result = file_get_contents($url, false, $context, -1, 40000);
+	return $result;
     }
 }
 
