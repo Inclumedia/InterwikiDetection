@@ -38,6 +38,7 @@ $wgExtensionCredits['other'][] = array(
 
 $wgAutoloadClasses['InterwikiDetectionHooks'] = __DIR__ . '/InterwikiDetection.hooks.php';
 $wgAutoloadClasses['PollAction'] = __DIR__ . '/InterwikiDetection.hooks.php';
+$wgAutoloadClasses['NullifyAction'] = __DIR__ . '/InterwikiDetection.hooks.php';
 $wgExtensionMessagesFiles['InterwikiDetection'] = __DIR__ . '/InterwikiDetection.i18n.php';
 
 $wgHooks['LoadExtensionSchemaUpdates'][] =
@@ -56,6 +57,7 @@ $wgHooks['SkinTemplateTabs'][] = 'InterwikiDetectionHooks::InterwikiDetectionSki
 $wgHooks['SkinTemplateNavigation'][] =
 	'InterwikiDetectionHooks::InterwikiDetectionSkinTemplateNavigation';
 $wgActions['poll'] = 'PollAction';
+$wgActions['nullify'] = 'NullifyAction';
 $wgInterwikiDetectionNamespaces = array(
 	-2 => 'Media:',
 	-1 => 'Special:',
@@ -83,6 +85,7 @@ $wgInterwikiDetectionNamespaces = array(
 );
 $wgInterwikiDetectionWikipediaUrl = 'https://en.wikipedia.org/wiki/$1';
 $wgGroupPermissions['sysop']['poll'] = true;
+$wgGroupPermissions['sysop']['nullify'] = true;
 // Don't poll more than once every x seconds
 $wgInterwikiDetectionMinimumSecondsBetweenPolls = -1;
 // This is to prevent infinite loops from occurring

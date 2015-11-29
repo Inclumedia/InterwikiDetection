@@ -68,7 +68,7 @@ class InterwikiDetectionHooks {
     }
 
     public static function doPoll( $existingInterwikis, $existingLinks, $updatedInterwikis,
-	$updatedLinks ) {
+	$updatedLinks, $onlyPoll = false ) {
 	global $wgInterwikiDetectionWikipediaPrefixes, $wgInterwikiDetectionNamespaces, $wgUser,
 	    $wgInterwikiDetectionApiQueryBegin, $wgInterwikiDetectionApiQuerySeparator,
 	    $wgInterwikiDetectionApiQueryEnd, $wgInterwikiDetectionOrphanInterval,
@@ -81,176 +81,178 @@ class InterwikiDetectionHooks {
 	#echo "\n\nupdatedLinks";
 	#var_dump( $updatedLinks );
 	// Get the deleted interwikis
-	$deletedInterwikis = array();
-	foreach ( $existingInterwikis as $prefix => $dbkeys ) {
-	    if ( isset( $updatedInterwikis[$prefix] ) ) {
-		    $deletedInterwikis[$prefix] = array_diff_key( $existingInterwikis[$prefix],
-			$updatedInterwikis[$prefix] );
-	    } else {
-		    $deletedInterwikis[$prefix] = $existingInterwikis[$prefix];
-	    }
-	}
-	// Get the inserted interwikis
-	$insertedInterwikis = array();
-	foreach ( $updatedInterwikis as $prefix => $dbkeys ) {
-	    if ( isset( $existingInterwikis[$prefix] ) ) {
-		    $insertedInterwikis[$prefix] = array_diff_key(
-			$updatedInterwikis[$prefix], $existingInterwikis[$prefix] );
-	    } else {
-		    $insertedInterwikis[$prefix] = $updatedInterwikis[$prefix];
-	    }
-	}
-	// Get the deleted pagelinks
-	$deletedLinks = array();
-	foreach ( $existingLinks as $ns => $dbkeys ) {
-	    if ( isset( $updatedLinks[$ns] ) ) {
-		    $deletedLinks[$ns] = array_diff_key( $existingLinks[$ns],
-			$updatedLinks[$ns] );
-	    } else {
-		    $deletedLinks[$ns] = $existingLinks[$ns];
-	    }
-	}
-	// Get the inserted pagelinks
-	$insertedLinks = array();
-	foreach ( $updatedLinks as $ns => $dbkeys ) {
-	    if ( isset( $existingLinks[$ns] ) ) {
-		    $insertedLinks[$ns] = array_diff_key( $updatedLinks[$ns],
-			$existingLinks[$ns] );
-	    } else {
-		    $insertedLinks[$ns] = $updatedLinks[$ns];
-	    }
-	}
-	// Get rid of non-Wikipedia interwiki deletions
-	foreach ( $deletedInterwikis as $prefix => $element ) {
-	    if ( !in_array( $prefix, $wgInterwikiDetectionWikipediaPrefixes ) ) {
-		unset( $deletedInterwikis[$prefix] );
-	    }
-	}
-	// Get rid of non-Wikipedia interwiki insertions
-	foreach ( $insertedInterwikis as $prefix => $element ) {
-	    if ( !in_array( $prefix, $wgInterwikiDetectionWikipediaPrefixes ) ) {
-		unset( $insertedInterwikis[$prefix] );
-	    }
-	}
-	// Merge all interwiki deletions from the remaining prefixes (wikipedia:, w:, etc.)
-	$deletedWikipediaInterwikis = array();
-	foreach( $deletedInterwikis as $prefix ) {
-	    foreach ( $prefix as $key => $element ) {
-		$key = ucfirst ( $key );
-		$key = str_replace( ' ', '_', $key );
-		if ( !in_array( $key, $deletedWikipediaInterwikis ) ) {
-		    $deletedWikipediaInterwikis[$key] = $element;
+	if ( !$onlyPoll ) {
+	    $deletedInterwikis = array();
+	    foreach ( $existingInterwikis as $prefix => $dbkeys ) {
+		if ( isset( $updatedInterwikis[$prefix] ) ) {
+			$deletedInterwikis[$prefix] = array_diff_key( $existingInterwikis[$prefix],
+			    $updatedInterwikis[$prefix] );
+		} else {
+			$deletedInterwikis[$prefix] = $existingInterwikis[$prefix];
 		}
 	    }
-	}
-	// Merge all interwiki insertions from the remaining prefixes (wikipedia:, w:, etc.)
-	$insertedWikipediaInterwikis = array();
-	foreach( $insertedInterwikis as $prefix ) {
-	    foreach ( $prefix as $key => $element ) {
-		$key = ucfirst ( $key );
-		$key = str_replace( ' ', '_', $key );
-		if ( !in_array( $key, $insertedWikipediaInterwikis ) ) {
-		    $insertedWikipediaInterwikis[$key] = $element;
+	    // Get the inserted interwikis
+	    $insertedInterwikis = array();
+	    foreach ( $updatedInterwikis as $prefix => $dbkeys ) {
+		if ( isset( $existingInterwikis[$prefix] ) ) {
+			$insertedInterwikis[$prefix] = array_diff_key(
+			    $updatedInterwikis[$prefix], $existingInterwikis[$prefix] );
+		} else {
+			$insertedInterwikis[$prefix] = $updatedInterwikis[$prefix];
 		}
 	    }
-	}
-	#echo "\n\ninsertedInterwikis";
-	#var_dump( $insertedInterwikis );
-	#echo "\n\ninsertedWikipediaInterwikis";
-	#var_dump( $insertedWikipediaInterwikis );
-	#echo "\n\ndeletedInterwikis";
-	#var_dump( $deletedInterwikis );
-	#echo "\n\ninsertedLinks";
-	#var_dump( $insertedLinks );
-	#echo "\n\ndeletedLinks";
-	#var_dump( $deletedLinks );
-
-	#die();
-	// Merge in the deleted mainspace pagelinks
-	$wikipediaMergedDeletions = $deletedWikipediaInterwikis;
-	if ( isset( $deletedLinks[0] ) ) {
-	    $wikipediaMergedDeletions = array_merge( $wikipediaMergedDeletions, $deletedLinks[0] );
-	}
-	// Merge in the inserted mainspace pagelinks
-	$wikipediaMergedInsertions = $insertedWikipediaInterwikis;
-	if ( isset( $insertedLinks[0] ) ) {
-	    $wikipediaMergedInsertions = array_merge( $wikipediaMergedInsertions, $insertedLinks[0] );
-	}
-	$wikipediaMergedDeletions = array_keys( $wikipediaMergedDeletions );
-	$wikipediaMergedInsertions = array_keys( $wikipediaMergedInsertions );
-	#echo "\nwikipediaMergedDeletions";
-	#var_dump( $wikipediaMergedDeletions );
-	#echo "\nwikipediaMergedInsertions";
-	#var_dump( $wikipediaMergedInsertions );
-	#die();
-
-	// See if the deleted ones exist anywhere in either table (pagelinks or iwlinks)
-	// If they don't, mark them to be purged
-	foreach ( $wikipediaMergedDeletions as $deletion ) {
-	    $title = Title::newFromText( $deletion );
-	    // Is it in the pagelinks table?
-	    $test = $dbr->selectRow(
-		'pagelinks',
-		array( 'pl_namespace' ),
-		array( 'pl_namespace' => $title->getNamespace(), 'pl_title' => $title->getDBKey )
-	    );
-	    if ( $test ) {
-		continue;
+	    // Get the deleted pagelinks
+	    $deletedLinks = array();
+	    foreach ( $existingLinks as $ns => $dbkeys ) {
+		if ( isset( $updatedLinks[$ns] ) ) {
+			$deletedLinks[$ns] = array_diff_key( $existingLinks[$ns],
+			    $updatedLinks[$ns] );
+		} else {
+			$deletedLinks[$ns] = $existingLinks[$ns];
+		}
 	    }
-	    // Is it in the iwlinks table? Check prefixes w:, wikipedia:, etc.
-	    foreach ( $wgInterwikiDetectionWikipediaPrefixes as $prefix ) {
-		$test = $dbr->selectRow( 'iwlinks', array( 'iwl_prefix' ),
-		    array( 'iwl_prefix' => $prefix, 'iwl_title' => $deletion ) );
+	    // Get the inserted pagelinks
+	    $insertedLinks = array();
+	    foreach ( $updatedLinks as $ns => $dbkeys ) {
+		if ( isset( $existingLinks[$ns] ) ) {
+			$insertedLinks[$ns] = array_diff_key( $updatedLinks[$ns],
+			    $existingLinks[$ns] );
+		} else {
+			$insertedLinks[$ns] = $updatedLinks[$ns];
+		}
+	    }
+	    // Get rid of non-Wikipedia interwiki deletions
+	    foreach ( $deletedInterwikis as $prefix => $element ) {
+		if ( !in_array( $prefix, $wgInterwikiDetectionWikipediaPrefixes ) ) {
+		    unset( $deletedInterwikis[$prefix] );
+		}
+	    }
+	    // Get rid of non-Wikipedia interwiki insertions
+	    foreach ( $insertedInterwikis as $prefix => $element ) {
+		if ( !in_array( $prefix, $wgInterwikiDetectionWikipediaPrefixes ) ) {
+		    unset( $insertedInterwikis[$prefix] );
+		}
+	    }
+	    // Merge all interwiki deletions from the remaining prefixes (wikipedia:, w:, etc.)
+	    $deletedWikipediaInterwikis = array();
+	    foreach( $deletedInterwikis as $prefix ) {
+		foreach ( $prefix as $key => $element ) {
+		    $key = ucfirst ( $key );
+		    $key = str_replace( ' ', '_', $key );
+		    if ( !in_array( $key, $deletedWikipediaInterwikis ) ) {
+			$deletedWikipediaInterwikis[$key] = $element;
+		    }
+		}
+	    }
+	    // Merge all interwiki insertions from the remaining prefixes (wikipedia:, w:, etc.)
+	    $insertedWikipediaInterwikis = array();
+	    foreach( $insertedInterwikis as $prefix ) {
+		foreach ( $prefix as $key => $element ) {
+		    $key = ucfirst ( $key );
+		    $key = str_replace( ' ', '_', $key );
+		    if ( !in_array( $key, $insertedWikipediaInterwikis ) ) {
+			$insertedWikipediaInterwikis[$key] = $element;
+		    }
+		}
+	    }
+	    #echo "\n\ninsertedInterwikis";
+	    #var_dump( $insertedInterwikis );
+	    #echo "\n\ninsertedWikipediaInterwikis";
+	    #var_dump( $insertedWikipediaInterwikis );
+	    #echo "\n\ndeletedInterwikis";
+	    #var_dump( $deletedInterwikis );
+	    #echo "\n\ninsertedLinks";
+	    #var_dump( $insertedLinks );
+	    #echo "\n\ndeletedLinks";
+	    #var_dump( $deletedLinks );
+
+	    #die();
+	    // Merge in the deleted mainspace pagelinks
+	    $wikipediaMergedDeletions = $deletedWikipediaInterwikis;
+	    if ( isset( $deletedLinks[0] ) ) {
+		$wikipediaMergedDeletions = array_merge( $wikipediaMergedDeletions, $deletedLinks[0] );
+	    }
+	    // Merge in the inserted mainspace pagelinks
+	    $wikipediaMergedInsertions = $insertedWikipediaInterwikis;
+	    if ( isset( $insertedLinks[0] ) ) {
+		$wikipediaMergedInsertions = array_merge( $wikipediaMergedInsertions, $insertedLinks[0] );
+	    }
+	    $wikipediaMergedDeletions = array_keys( $wikipediaMergedDeletions );
+	    $wikipediaMergedInsertions = array_keys( $wikipediaMergedInsertions );
+	    #echo "\nwikipediaMergedDeletions";
+	    #var_dump( $wikipediaMergedDeletions );
+	    #echo "\nwikipediaMergedInsertions";
+	    #var_dump( $wikipediaMergedInsertions );
+	    #die();
+
+	    // See if the deleted ones exist anywhere in either table (pagelinks or iwlinks)
+	    // If they don't, mark them to be purged
+	    foreach ( $wikipediaMergedDeletions as $deletion ) {
+		$title = Title::newFromText( $deletion );
+		// Is it in the pagelinks table?
+		$test = $dbr->selectRow(
+		    'pagelinks',
+		    array( 'pl_namespace' ),
+		    array( 'pl_namespace' => $title->getNamespace(), 'pl_title' => $title->getDBKey )
+		);
 		if ( $test ) {
-		    continue 2;
+		    continue;
 		}
-	    }
-	    // It wasn't found in pagelinks or iwlinks, so mark it to be purged
-	    $dbw->update(
-		'iw_detection',
-		array( 'iwd_orphaned' => $currentTime ),
-		array( 'iwd_title' => $deletion )
-	    );
-	}
-	// The inserted ones, see if they already exist in the iw_detection table
-	// If they do exist, and iwd_orphaned isn't 99999999999999, make it 99999999999999
-	// If they don't exist, add them and mark them for polling (set iwd_exists to
-	// 00000000000000).
-	foreach ( $wikipediaMergedInsertions as $insertion ) {
-	    $res = $dbr->selectRow(
-		'iw_detection',
-		array( 'iwd_id', 'iwd_orphaned' ),
-		array( 'iwd_title' => $insertion )
-	    );
-	    if ( $res ) {
-		if ( $res->iwd_orphaned !== 99999999999999 ) {
-		    $dbw->update (
-			'iw_detection',
-			array ( 'iwd_orphaned' => 99999999999999 ),
-			array( 'iwd_id' => $res->iwd_id )
-		    );
+		// Is it in the iwlinks table? Check prefixes w:, wikipedia:, etc.
+		foreach ( $wgInterwikiDetectionWikipediaPrefixes as $prefix ) {
+		    $test = $dbr->selectRow( 'iwlinks', array( 'iwl_prefix' ),
+			array( 'iwl_prefix' => $prefix, 'iwl_title' => $deletion ) );
+		    if ( $test ) {
+			continue 2;
+		    }
 		}
-	    } else {
-		$dbw->insert(
+		// It wasn't found in pagelinks or iwlinks, so mark it to be purged
+		$dbw->update(
 		    'iw_detection',
+		    array( 'iwd_orphaned' => $currentTime ),
+		    array( 'iwd_title' => $deletion )
+		);
+	    }
+	    // The inserted ones, see if they already exist in the iw_detection table
+	    // If they do exist, and iwd_orphaned isn't 99999999999999, make it 99999999999999
+	    // If they don't exist, add them and mark them for polling (set iwd_exists to
+	    // 00000000000000).
+	    foreach ( $wikipediaMergedInsertions as $insertion ) {
+		$res = $dbr->selectRow(
+		    'iw_detection',
+		    array( 'iwd_id', 'iwd_orphaned' ),
 		    array( 'iwd_title' => $insertion )
 		);
+		if ( $res ) {
+		    if ( $res->iwd_orphaned !== 99999999999999 ) {
+			$dbw->update (
+			    'iw_detection',
+			    array ( 'iwd_orphaned' => 99999999999999 ),
+			    array( 'iwd_id' => $res->iwd_id )
+			);
+		    }
+		} else {
+		    $dbw->insert(
+			'iw_detection',
+			array( 'iwd_title' => $insertion )
+		    );
+		}
 	    }
-	}
-	// Purge everything with iwd_orphaned more than z seconds old
-	$res = $dbr->select(
-	    'iw_detection',
-	    array( 'iwd_id', 'iwd_title', 'iwd_orphaned' ),
-	    array(),
-	    __METHOD__,
-	    array( 'ORDER BY' => 'iwd_orphaned ASC', 'LIMIT' => 500 )
-	);
-	foreach ( $res as $row ) {
-	    if ( $currentTime - $row->iwd_orphaned > $wgInterwikiDetectionOrphanInterval ) {
-		$dbw->delete(
-		    'iw_detection',
-		    array( 'iwd_id' => $row->iwd_id )
-		);
+	    // Purge everything with iwd_orphaned more than z seconds old
+	    $res = $dbr->select(
+		'iw_detection',
+		array( 'iwd_id', 'iwd_title', 'iwd_orphaned' ),
+		array(),
+		__METHOD__,
+		array( 'ORDER BY' => 'iwd_orphaned ASC', 'LIMIT' => 500 )
+	    );
+	    foreach ( $res as $row ) {
+		if ( $currentTime - $row->iwd_orphaned > $wgInterwikiDetectionOrphanInterval ) {
+		    $dbw->delete(
+			'iw_detection',
+			array( 'iwd_id' => $row->iwd_id )
+		    );
+		}
 	    }
 	}
 	// Make a list of the 500 rows with the oldest iwd_polled.
@@ -449,7 +451,14 @@ class InterwikiDetectionHooks {
 	    // Vector support
 	    'href' => $skin->getTitle()->getLocalUrl( 'action=poll' )
 	);
-	 return true;
+	$content_actions['nullify'] = array(
+	    'class' => ( $action ==
+		'nullify') ? 'selected' : false,
+	        'text' => "Nullify",
+	    // Vector support
+	    'href' => $skin->getTitle()->getLocalUrl( 'action=nullify' )
+	);
+	return true;
     }
 
     // Vector support
@@ -494,12 +503,12 @@ class InterwikiDetectionHooks {
     }
 }
 
-class PollAction extends FormAction {
+class NullifyAction extends FormAction {
 
 	private $redirectParams;
 
 	public function getName() {
-		return 'poll';
+		return 'nullify';
 	}
 
 	public function requiresUnblock() {
@@ -554,6 +563,75 @@ class PollAction extends FormAction {
 	    #echo "\n\nupdatedInterwikis";
 	    #var_dump( $updatedInterwikis );
 	    InterwikiDetectionHooks::doPoll( array(), array(), $existingInterwikis, $existingLinks );
+	    return $this->page->doPurge();
+	}
+
+	public function show() {
+		$this->setHeaders();
+
+		// This will throw exceptions if there's a problem
+		$this->checkCanExecute( $this->getUser() );
+
+		if ( $this->getUser()->isAllowed( 'nullify' ) ) {
+			$this->redirectParams = wfArrayToCgi( array_diff_key(
+				$this->getRequest()->getQueryValues(),
+				array( 'title' => null, 'action' => null )
+			) );
+			if ( $this->onSubmit( array() ) ) {
+				$this->onSuccess();
+			}
+		} else {
+			$this->redirectParams = $this->getRequest()->getVal( 'redirectparams', '' );
+			$form = $this->getForm();
+			if ( $form->show() ) {
+				$this->onSuccess();
+			}
+		}
+	}
+
+	protected function alterForm( HTMLForm $form ) {
+		$form->setSubmitTextMsg( 'confirm_nullify_button' );
+	}
+
+	protected function preText() {
+		return $this->msg( 'confirm-nullify-top' )->parse();
+	}
+
+	protected function postText() {
+		return $this->msg( 'confirm-nullify-bottom' )->parse();
+	}
+
+	public function onSuccess() {
+		$this->getOutput()->redirect( $this->getTitle()->getFullURL( $this->redirectParams ) );
+	}
+}
+
+class PollAction extends FormAction {
+
+	private $redirectParams;
+
+	public function getName() {
+		return 'poll';
+	}
+
+	public function requiresUnblock() {
+		return false;
+	}
+
+	public function getDescription() {
+		return '';
+	}
+
+	/**
+	 * Just get an empty form with a single submit button
+	 * @return array
+	 */
+	protected function getFormFields() {
+		return array();
+	}
+
+	public function onSubmit( $data ) {
+	    InterwikiDetectionHooks::doPoll( array(), array(), array(), array(), true );
 	    return $this->page->doPurge();
 	}
 
